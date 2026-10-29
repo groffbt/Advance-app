@@ -35,3 +35,4 @@ textarea{min-height:90px;resize:vertical}
 .hint{font-size:12px;color:#888;margin-top:4px}
 .chk{display:flex;align-items:center;gap:8px;margin-top:8px}.chk input{width:24px;height:24px}
 [hidden]{display:none!important}
+.cap{margin-top:4px;font-size:14px;padding:7px 8px}.psec{background:#fff}

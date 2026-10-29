@@ -50,11 +50,19 @@ function blank() {
     intel: { eventRisk: '', eventText: '', areaName: '', areaRisk: '', areaText: '', movement: '', protest: '', contingency: '' },
     taskOrg: { advance: '', movement: '', night: '' },
     vehicles: [], timelineZone: 'LOCAL', timeline: [], contacts: [], locations: [],
-    routes: { notes: '', legs: [], alertLabel: 'Restricted', alert: '' }, arrival: '', dropLabel: 'EVENT', photos: [],
+    routes: { notes: '', legs: [], alertLabel: 'Restricted', alert: '' }, arrival: '', photoSections: [],
     coordination: [''], lodging: '', medical: { label: '', hospitals: [] }
   };
 }
-function normalize(r) { const b = blank(); for (const k in b) if (r[k] == null) r[k] = b[k]; for (const k of ['header', 'overview', 'intel', 'taskOrg', 'routes', 'medical']) r[k] = Object.assign(clone(b[k]), r[k]); return r; }
+function migrate(r) { // old format: r.photos + r.dropLabel -> one titled section
+  if (!Array.isArray(r.photoSections)) r.photoSections = [];
+  if (Array.isArray(r.photos)) { if (r.photos.length) r.photoSections.unshift({ id: uid(), title: 'Drop Site — Event', photos: r.photos }); }
+  delete r.photos; delete r.dropLabel;
+  r.photoSections.forEach(sc => { sc.id ||= uid(); sc.title ??= ''; sc.photos ||= []; sc.photos.forEach(p => (p.caption ??= '')); });
+  return r;
+}
+const allPhotos = r => (r.photoSections || []).flatMap(sc => sc.photos || []);
+function normalize(r) { migrate(r); const b = blank(); for (const k in b) if (r[k] == null) r[k] = b[k]; for (const k of ['header', 'overview', 'intel', 'taskOrg', 'routes', 'medical']) r[k] = Object.assign(clone(b[k]), r[k]); return r; }
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const setP = (o, p, v) => { const ks = p.split('.'); const last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; };
 
@@ -73,10 +81,10 @@ async function compress(file, max = 1600, q = 0.72) {
 }
 const toDataURL = blob => new Promise(res => { const f = new FileReader(); f.onload = () => res(f.result); f.readAsDataURL(blob); });
 function dataURLtoBlob(d) { const [m, b] = d.split(','); const bin = atob(b); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new Blob([a], { type: m.slice(5).split(';')[0] }); }
-async function addPhotos(r, files) {
+async function addPhotos(arr, files) {
   for (const f of files) {
     const { blob, w, h: hh } = await compress(f);
-    const id = uid(); await DB.putPhoto({ id, blob }); r.photos.push({ id, w, h: hh, caption: '' });
+    const id = uid(); await DB.putPhoto({ id, blob }); arr.push({ id, w, h: hh, caption: '' });
   }
 }
 async function copyPhotos(list) {
@@ -86,7 +94,7 @@ async function copyPhotos(list) {
 }
 
 /* ---------- Seed sample ---------- */
-async function seed() { /* no bundled sample */ }
+async function seed() { /* public build: no bundled sample */ }
 
 /* ---------- Views ---------- */
 let cur = null, saveT = null;
@@ -118,9 +126,9 @@ async function listView() {
       h('div', { class: 'muted' }, 'Edited ' + new Date(r.updated).toLocaleString()),
       h('div', { class: 'row' },
         h('button', { class: 'primary sm', onclick: () => (location.hash = '#r/' + r.id) }, 'Open'),
-        h('button', { class: 'sm', onclick: async () => { const n = normalize(clone(r)); n.id = uid(); n.name = 'Copy of ' + r.name; n.updated = Date.now(); n.photos = await copyPhotos(r.photos || []); await DB.put(n); listView(); } }, 'Duplicate'),
+        h('button', { class: 'sm', onclick: async () => { const n = normalize(clone(r)); n.id = uid(); n.name = 'Copy of ' + r.name; n.updated = Date.now(); for (const sc of n.photoSections) { sc.id = uid(); sc.photos = await copyPhotos(sc.photos); } await DB.put(n); listView(); } }, 'Duplicate'),
         h('button', { class: 'sm', onclick: () => exportJSON(r) }, 'Export'),
-        h('button', { class: 'danger sm', onclick: () => sheet('Delete “' + r.name + '”? This cannot be undone.', [['Delete report', async () => { for (const p of r.photos || []) await DB.delPhoto(p.id); await DB.del(r.id); listView(); }, 'danger']]) }, 'Delete'))));
+        h('button', { class: 'danger sm', onclick: () => sheet('Delete “' + r.name + '”? This cannot be undone.', [['Delete report', async () => { for (const p of allPhotos(normalize(clone(r)))) await DB.delPhoto(p.id); await DB.del(r.id); listView(); }, 'danger']]) }, 'Delete'))));
   }
   view.append(h('p', { class: 'hint' }, 'All data stays on this device (IndexedDB). Nothing is sent anywhere. Use Export to back up or share a report between phones.'));
 }
@@ -172,27 +180,47 @@ function rows(path, cols, addLabel, extra) {
   };
   draw(); return wrap;
 }
-function photoGrid() {
+function photoGrid(sc) {
   const wrap = h('div'); const urls = [];
-  const fileIn = h('input', { type: 'file', accept: 'image/*', multiple: true, style: 'display:none' });
+  const fileIn = h('input', { type: 'file', accept: 'image/*', multiple: true, style: 'display:none', class: 'lib-in' });
   const camIn = h('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none' });
   const status = h('div', { class: 'hint' });
-  const onFiles = async e => { const fs = [...e.target.files]; e.target.value = ''; if (!fs.length) return; status.textContent = 'Compressing ' + fs.length + ' photo(s)…'; await addPhotos(cur, fs); await flush(); status.textContent = ''; draw(); };
+  const onFiles = async e => { const fs = [...e.target.files]; e.target.value = ''; if (!fs.length) return; status.textContent = 'Compressing ' + fs.length + ' photo(s)…'; await addPhotos(sc.photos, fs); await flush(); status.textContent = ''; draw(); };
   fileIn.onchange = onFiles; camIn.onchange = onFiles;
   const grid = h('div', { class: 'photos' });
   const draw = async () => {
-    urls.splice(0).forEach(URL.revokeObjectURL); grid.innerHTML = '';
-    const arr = cur.photos;
+    urls.splice(0).forEach(URL.revokeObjectURL);
+    const arr = sc.photos; const cells = [];
     for (let i = 0; i < arr.length; i++) {
       const rec = await DB.photo(arr[i].id); const u = rec ? URL.createObjectURL(rec.blob) : ''; urls.push(u);
-      grid.append(h('div', { class: 'ph' }, h('img', { src: u, alt: 'photo ' + (i + 1) }),
+      const cap = h('input', { type: 'text', class: 'cap', placeholder: 'Caption (optional)', value: arr[i].caption || '' });
+      cap.value = arr[i].caption || ''; cap.oninput = () => { arr[i].caption = cap.value; save(); };
+      cells.push(h('div', {}, h('div', { class: 'ph' }, h('img', { src: u, alt: 'photo ' + (i + 1) }),
         h('button', { class: 'x', 'aria-label': 'Remove photo', onclick: () => sheet('Remove this photo?', [['Remove', async () => { await DB.delPhoto(arr[i].id); arr.splice(i, 1); await flush(); draw(); }, 'danger']]) }, '✕'),
         h('div', { class: 'mv' }, i > 0 ? h('button', { onclick: () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; save(); draw(); } }, '‹') : null,
-          i < arr.length - 1 ? h('button', { onclick: () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; save(); draw(); } }, '›') : null)));
+          i < arr.length - 1 ? h('button', { onclick: () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; save(); draw(); } }, '›') : null)), cap));
     }
+    grid.replaceChildren(...cells);
   };
-  wrap.append(h('div', { class: 'row' }, h('button', { class: 'primary sm', onclick: () => camIn.click() }, '📷 Camera'), h('button', { class: 'sm', onclick: () => fileIn.click() }, '🖼 Photo library')), fileIn, camIn, status, grid,
-    h('div', { class: 'hint' }, 'Photos are resized to ≤1600px JPEG on-device and laid out 3 per row in the PDF.'));
+  wrap.append(h('div', { class: 'row' }, h('button', { class: 'primary sm', onclick: () => camIn.click() }, '📷 Camera'), h('button', { class: 'sm', onclick: () => fileIn.click() }, '🖼 Photo library')), fileIn, camIn, status, grid);
+  draw(); return wrap;
+}
+function photoSections() {
+  const wrap = h('div');
+  const draw = () => {
+    const arr = cur.photoSections; wrap.innerHTML = '';
+    arr.forEach((sc, i) => {
+      const t = h('input', { type: 'text', class: 'sec-title', placeholder: 'e.g. Drop Site — Event, FBO Arrival, Hotel Entrance', autocapitalize: 'words' }); t.value = sc.title;
+      t.oninput = () => { sc.title = t.value; save(); };
+      wrap.append(h('div', { class: 'item psec' }, h('label', {}, 'Section title'), t, photoGrid(sc),
+        h('div', { class: 'tools', style: 'margin-top:8px' },
+          i > 0 ? h('button', { class: 'sm', onclick: () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; save(); draw(); } }, '↑ Move up') : null,
+          i < arr.length - 1 ? h('button', { class: 'sm', onclick: () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; save(); draw(); } }, '↓ Move down') : null,
+          h('button', { class: 'danger sm', onclick: () => sheet('Delete section “' + (sc.title || 'Untitled') + '” and its ' + sc.photos.length + ' photo(s)?', [['Delete section', async () => { for (const p of sc.photos) await DB.delPhoto(p.id); arr.splice(i, 1); await flush(); draw(); }, 'danger']]) }, 'Delete section'))));
+    });
+    wrap.append(h('button', { class: 'primary sm add-psec', onclick: () => { arr.push({ id: uid(), title: '', photos: [] }); save(); draw(); wrap.querySelectorAll('.sec-title')[arr.length - 1].focus(); } }, '＋ Add photo section'),
+      h('div', { class: 'hint' }, 'Each section prints as its own titled header with a 3-across photo grid. Photos are resized to ≤1600px JPEG on-device. Sections without photos are skipped in the PDF.'));
+  };
   draw(); return wrap;
 }
 
@@ -226,7 +254,7 @@ async function editView(id) {
       rows('routes.legs', [['leg', 'Leg'], ['time', 'Time / distance']], 'Add leg', 'grid'),
       inp('routes.alertLabel', 'Callout label', { ph: 'Restricted' }), inp('routes.alert', 'Restricted / alert callout', { area: true, rows: 2 })),
     S('Arrival / park plan — FBO', false, inp('arrival', null, { area: true })),
-    S('Drop site — photos', false, inp('dropLabel', 'Drop site label', { ph: 'EVENT', caps: 'characters' }), photoGrid()),
+    S('Location photos', false, photoSections()),
     S('Coordination instructions', false, strList('coordination', null, 'Attire: Business Formal')),
     S('Lodging for team', false, inp('lodging', null, { area: true, rows: 2 })),
     S('Medical contingencies', false, inp('medical.label', 'Event label', { ph: 'Venue (Thu 8 OCT)' }),
@@ -243,9 +271,13 @@ const loadScript = src => new Promise((res, rej) => { const s = document.createE
 let libs; const loadPdfLibs = () => (libs ||= loadScript('lib/pdfmake.min.js').then(() => loadScript('lib/fonts.js')));
 async function buildPdfBlob(r) {
   await loadPdfLibs();
-  const photos = [];
-  for (const p of r.photos || []) { const rec = await DB.photo(p.id); if (rec) photos.push({ dataUrl: await toDataURL(rec.blob), w: p.w, h: p.h, caption: p.caption }); }
-  const dd = window.buildDocDefinition(r, photos);
+  const secs = [];
+  for (const sc of r.photoSections || []) {
+    const photos = [];
+    for (const p of sc.photos) { const rec = await DB.photo(p.id); if (rec) photos.push({ dataUrl: await toDataURL(rec.blob), w: p.w, h: p.h, caption: p.caption }); }
+    if (photos.length) secs.push({ title: sc.title, photos });
+  }
+  const dd = window.buildDocDefinition(r, secs);
   return new Promise((res, rej) => { try { pdfMake.createPdf(dd, null, window.PDF_FONTS).getBlob(res); } catch (e) { rej(e); } });
 }
 async function deliver(blob, name, type) {
@@ -268,9 +300,9 @@ async function generatePDF() {
 
 /* ---------- JSON export/import ---------- */
 async function exportJSON(r) {
-  const out = clone(r); out.photos = [];
-  for (const p of r.photos || []) { const rec = await DB.photo(p.id); if (rec) out.photos.push(Object.assign({}, p, { data: await toDataURL(rec.blob) })); }
-  const blob = new Blob([JSON.stringify({ format: 'advance-report', version: 1, report: out })], { type: 'application/json' });
+  const out = normalize(clone(r));
+  for (const sc of out.photoSections) { const ps = []; for (const p of sc.photos) { const rec = await DB.photo(p.id); if (rec) ps.push(Object.assign({}, p, { data: await toDataURL(rec.blob) })); } sc.photos = ps; }
+  const blob = new Blob([JSON.stringify({ format: 'advance-report', version: 2, report: out })], { type: 'application/json' });
   deliver(blob, fname(r, 'json'), 'application/json');
 }
 function importJSON() {
@@ -278,8 +310,8 @@ function importJSON() {
   i.onchange = async () => {
     try {
       const j = JSON.parse(await i.files[0].text()); const src = j.report || j;
-      const r = normalize(Object.assign(blank(), src)); r.id = uid(); r.updated = Date.now(); r.photos = [];
-      for (const p of src.photos || []) { if (!p.data) continue; const id = uid(); await DB.putPhoto({ id, blob: dataURLtoBlob(p.data) }); r.photos.push({ id, w: p.w, h: p.h, caption: p.caption || '' }); }
+      const r = normalize(Object.assign(blank(), clone(src))); r.id = uid(); r.updated = Date.now(); // migrate() handles v1 'photos'
+      for (const sc of r.photoSections) { const ps = []; for (const p of sc.photos) { if (!p.data) continue; const id = uid(); await DB.putPhoto({ id, blob: dataURLtoBlob(p.data) }); ps.push({ id, w: p.w, h: p.h, caption: p.caption || '' }); } sc.id = uid(); sc.photos = ps; }
       await DB.put(r); location.hash = '#r/' + r.id;
     } catch (e) { alert('Import failed: ' + e.message); }
   };

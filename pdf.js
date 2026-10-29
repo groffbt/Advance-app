@@ -38,9 +38,9 @@
     return Object.assign({ margin: [0, 2, 0, 3], table: { headerRows: 1, dontBreakRows: true, widths,
       body: [heads.map(h => ({ text: h.toUpperCase(), bold: true, color: '#fff', fontSize: 6.3, characterSpacing: 0.4 })), ...rows] }, layout }, extra || {});
   }
-  const has = a => a && a.length;
+  const has = a => a && a.some(x => x && (typeof x !== 'object' || Object.values(x).some(Boolean)));
 
-  window.buildDocDefinition = function (r, photos) {
+  window.buildDocDefinition = function (r, photoSecs) {
     const h = r.header || {}; const c = [];
     // Header block
     c.push({ text: (h.org || '').toUpperCase(), bold: true, fontSize: 7.4, characterSpacing: 1.5, margin: [0, 0, 0, 2] });
@@ -103,22 +103,22 @@
     }
     if (r.arrival) { c.push(sec('Arrival / Park Plan — FBO')); lines(r.arrival).forEach(l => c.push({ text: rich(l), margin: [0, 0, 0, 3] })); }
 
-    if (photos && photos.length) {
-      c.push(sec('Drop Site' + (r.dropLabel ? ' — ' + r.dropLabel : '')));
+    (photoSecs || []).filter(sc => sc.photos && sc.photos.length).forEach(sc => {
+      c.push(sec(sc.title || 'Photos'));
+      const photos = sc.photos;
       const gap = 5, cw = (W - 2 * gap) / 3, ch = 137, iw = cw - 8, ih = ch - 8, gw = iw - 22;
       for (let k = 0; k < photos.length; k += 3) {
         const row = photos.slice(k, k + 3).map(ph => {
           const s = Math.min(gw / ph.w, ih / ph.h), dh = ph.h * s, top = (ih - dh) / 2;
-          const inner = { margin: [4, 4, 4, 4], table: { widths: ['*'], body: [[{ image: ph.dataUrl, fit: [gw, ih], alignment: 'center', fillColor: '#f2f2f2', margin: [0, top, 0, ih - dh - top] }]] }, layout: 'noBorders' };
-          const stack = [inner];
-          if (ph.caption) stack.push({ text: ph.caption, fontSize: 6.5, alignment: 'center', margin: [0, -2, 0, 3] });
-          return { width: cw, table: { widths: ['*'], body: [[{ stack, fillColor: '#fff' }]] },
+          const stack = [{ margin: [4, 4, 4, 4], table: { widths: ['*'], body: [[{ image: ph.dataUrl, fit: [gw, ih], alignment: 'center', margin: [0, top, 0, ih - dh - top] }]] }, layout: 'noBorders' }];
+          if (ph.caption) stack.push({ text: ph.caption, fontSize: 6.4, lineHeight: 1.1, alignment: 'center', margin: [4, -2, 4, 4] });
+          return { width: cw, table: { widths: ['*'], body: [[{ stack }]] },
             layout: { hLineWidth: () => 0.8, vLineWidth: () => 0.8, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 } };
         });
         while (row.length < 3) row.push({ width: cw, text: '' });
         c.push({ columns: row, columnGap: gap, margin: [0, k ? gap : 2, 0, 0], unbreakable: true });
       }
-    }
+    });
     if (has(r.coordination)) { c.push(sec('Coordination Instructions')); c.push({ ul: r.coordination.filter(Boolean).map(l => ({ text: labeled(l) })), margin: [6, 0, 0, 0] }); }
     if (r.lodging) { c.push(sec('Lodging for Team')); lines(r.lodging).forEach(l => c.push({ text: rich(l) })); }
     const m = r.medical || {};
