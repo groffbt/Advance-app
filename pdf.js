@@ -40,8 +40,24 @@
   }
   const has = a => a && a.some(x => x && (typeof x !== 'object' || Object.values(x).some(Boolean)));
 
-  window.buildDocDefinition = function (r, photoSecs) {
-    const h = r.header || {}; const c = [];
+  window.buildDocDefinition = function (r, photoSecs, inline) {
+    const h = r.header || {}; const c = []; inline = inline || {};
+    const grid = (photos, pre) => {
+      if (!photos || !photos.length) { (pre || []).forEach(x => c.push(x)); return; }
+      const gap = 5, cw = (W - 2 * gap) / 3, ch = 137, iw = cw - 8, ih = ch - 8, gw = iw - 22;
+      for (let k = 0; k < photos.length; k += 3) {
+        const row = photos.slice(k, k + 3).map(ph => {
+          const s = Math.min(gw / ph.w, ih / ph.h), dh = ph.h * s, top = (ih - dh) / 2;
+          const stack = [{ margin: [4, 4, 4, 4], table: { widths: ['*'], body: [[{ image: ph.dataUrl, fit: [gw, ih], alignment: 'center', margin: [0, top, 0, ih - dh - top] }]] }, layout: 'noBorders' }];
+          if (ph.caption) stack.push({ text: ph.caption, fontSize: 6.4, lineHeight: 1.1, alignment: 'center', margin: [4, -2, 4, 4] });
+          return { width: cw, table: { widths: ['*'], body: [[{ stack }]] },
+            layout: { hLineWidth: () => 0.8, vLineWidth: () => 0.8, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 } };
+        });
+        while (row.length < 3) row.push({ width: cw, text: '' });
+        const rowEl = { columns: row, columnGap: gap, margin: [0, k ? gap : 2, 0, 0] };
+        c.push(k === 0 && pre && pre.length ? { stack: [...pre, rowEl], unbreakable: true } : Object.assign(rowEl, { unbreakable: true }));
+      }
+    };
     // Header block
     c.push({ text: (h.org || '').toUpperCase(), bold: true, fontSize: 7.4, characterSpacing: 1.5, margin: [0, 0, 0, 2] });
     c.push({ columns: [
@@ -88,10 +104,18 @@
         r.timeline.map(e => [e.time, e.event, e.remarks].map(x => x || '')), [112, 165, '*']));
     }
     if (has(r.contacts)) { c.push(sec('Key Contacts')); c.push(table(['Name', 'Position', 'Contact information'], r.contacts.map(e => [e.name, e.position, e.contact].map(x => x || '')), [110, 160, '*'])); }
-    if (has(r.locations)) {
+    if (has((r.locations || []).map(({ photos, ...x }) => x))) {
       c.push(sec('Primary Locations'));
       c.push(table(['Name', 'Address', 'Map'], r.locations.map(e => [e.name || '', e.address || '',
         e.map ? { text: e.map.replace(/^https?:\/\//, ''), link: /^https?:/.test(e.map) ? e.map : 'https://' + e.map, font: 'Mono', fontSize: 5.6 } : '']), [62, '*', 140]));
+      r.locations.forEach((e, k) => {
+        const ph = (inline.locations || [])[k] || [];
+        if (!ph.length && !e.notes) return;
+        const pre = [{ text: (e.name || 'Location ' + (k + 1)).toUpperCase(), bold: true, fontSize: 7.4, characterSpacing: 1, margin: [0, 5, 0, 1] }];
+        if (e.address) pre.push({ text: e.address, fontSize: 7, color: '#333', margin: [0, 0, 0, 2] });
+        if (e.notes) lines(e.notes).forEach(l => pre.push({ text: rich(l), margin: [0, 0, 0, 2] }));
+        grid(ph, pre);
+      });
     }
     const ro = r.routes || {};
     if (ro.notes || has(ro.legs) || ro.alert) {
@@ -101,24 +125,10 @@
       if (ro.alert) c.push({ margin: [0, 2, 0, 2], table: { widths: ['*'], body: [[{ text: (ro.alertLabel ? ro.alertLabel + ' — ' : '') + ro.alert, bold: true, margin: [4, 3, 4, 3] }]] },
         layout: { hLineWidth: () => 1, vLineWidth: () => 1 } });
     }
-    if (r.arrival) { c.push(sec('Arrival / Park Plan — FBO')); lines(r.arrival).forEach(l => c.push({ text: rich(l), margin: [0, 0, 0, 3] })); }
+    if (inline.routes && inline.routes.length) { if (!(ro.notes || has(ro.legs) || ro.alert)) c.push(sec('Routes')); grid(inline.routes); }
+    if (r.arrival || (inline.arrival && inline.arrival.length)) { c.push(sec('Arrival / Park Plan — FBO')); lines(r.arrival).forEach(l => c.push({ text: rich(l), margin: [0, 0, 0, 3] })); grid(inline.arrival); }
 
-    (photoSecs || []).filter(sc => sc.photos && sc.photos.length).forEach(sc => {
-      c.push(sec(sc.title || 'Photos'));
-      const photos = sc.photos;
-      const gap = 5, cw = (W - 2 * gap) / 3, ch = 137, iw = cw - 8, ih = ch - 8, gw = iw - 22;
-      for (let k = 0; k < photos.length; k += 3) {
-        const row = photos.slice(k, k + 3).map(ph => {
-          const s = Math.min(gw / ph.w, ih / ph.h), dh = ph.h * s, top = (ih - dh) / 2;
-          const stack = [{ margin: [4, 4, 4, 4], table: { widths: ['*'], body: [[{ image: ph.dataUrl, fit: [gw, ih], alignment: 'center', margin: [0, top, 0, ih - dh - top] }]] }, layout: 'noBorders' }];
-          if (ph.caption) stack.push({ text: ph.caption, fontSize: 6.4, lineHeight: 1.1, alignment: 'center', margin: [4, -2, 4, 4] });
-          return { width: cw, table: { widths: ['*'], body: [[{ stack }]] },
-            layout: { hLineWidth: () => 0.8, vLineWidth: () => 0.8, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 } };
-        });
-        while (row.length < 3) row.push({ width: cw, text: '' });
-        c.push({ columns: row, columnGap: gap, margin: [0, k ? gap : 2, 0, 0], unbreakable: true });
-      }
-    });
+    (photoSecs || []).filter(sc => sc.photos && sc.photos.length).forEach(sc => grid(sc.photos, [sec(sc.title || 'Photos')]));
     if (has(r.coordination)) { c.push(sec('Coordination Instructions')); c.push({ ul: r.coordination.filter(Boolean).map(l => ({ text: labeled(l) })), margin: [6, 0, 0, 0] }); }
     if (r.lodging) { c.push(sec('Lodging for Team')); lines(r.lodging).forEach(l => c.push({ text: rich(l) })); }
     const m = r.medical || {};

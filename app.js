@@ -10,6 +10,7 @@ const h = (tag, attrs = {}, ...kids) => {
   for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k));
   return e;
 };
+const APP_VERSION = 'v3';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 const clone = o => JSON.parse(JSON.stringify(o));
 
@@ -50,7 +51,7 @@ function blank() {
     intel: { eventRisk: '', eventText: '', areaName: '', areaRisk: '', areaText: '', movement: '', protest: '', contingency: '' },
     taskOrg: { advance: '', movement: '', night: '' },
     vehicles: [], timelineZone: 'LOCAL', timeline: [], contacts: [], locations: [],
-    routes: { notes: '', legs: [], alertLabel: 'Restricted', alert: '' }, arrival: '', photoSections: [],
+    routes: { notes: '', legs: [], alertLabel: 'Restricted', alert: '' }, arrival: '', arrivalMedia: { photos: [] }, photoSections: [],
     coordination: [''], lodging: '', medical: { label: '', hospitals: [] }
   };
 }
@@ -58,10 +59,16 @@ function migrate(r) { // old format: r.photos + r.dropLabel -> one titled sectio
   if (!Array.isArray(r.photoSections)) r.photoSections = [];
   if (Array.isArray(r.photos)) { if (r.photos.length) r.photoSections.unshift({ id: uid(), title: 'Drop Site — Event', photos: r.photos }); }
   delete r.photos; delete r.dropLabel;
-  r.photoSections.forEach(sc => { sc.id ||= uid(); sc.title ??= ''; sc.photos ||= []; sc.photos.forEach(p => (p.caption ??= '')); });
+  r.photoSections.forEach(sc => { sc.id ||= uid(); sc.title ??= ''; });
+  if (!r.arrivalMedia || !Array.isArray(r.arrivalMedia.photos)) r.arrivalMedia = { photos: [] };
+  if (r.routes) r.routes.photos ||= [];
+  (r.locations || []).forEach(l => { l.notes ??= ''; l.photos ||= []; });
+  holders(r).forEach(hd => { hd.photos ||= []; hd.photos.forEach(p => (p.caption ??= '')); });
   return r;
 }
-const allPhotos = r => (r.photoSections || []).flatMap(sc => sc.photos || []);
+// every object that owns a .photos array
+function holders(r) { return [r.arrivalMedia, r.routes, ...(r.locations || []), ...(r.photoSections || [])].filter(Boolean); }
+const allPhotos = r => holders(r).flatMap(hd => hd.photos || []);
 function normalize(r) { migrate(r); const b = blank(); for (const k in b) if (r[k] == null) r[k] = b[k]; for (const k of ['header', 'overview', 'intel', 'taskOrg', 'routes', 'medical']) r[k] = Object.assign(clone(b[k]), r[k]); return r; }
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const setP = (o, p, v) => { const ks = p.split('.'); const last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; };
@@ -126,7 +133,7 @@ async function listView() {
       h('div', { class: 'muted' }, 'Edited ' + new Date(r.updated).toLocaleString()),
       h('div', { class: 'row' },
         h('button', { class: 'primary sm', onclick: () => (location.hash = '#r/' + r.id) }, 'Open'),
-        h('button', { class: 'sm', onclick: async () => { const n = normalize(clone(r)); n.id = uid(); n.name = 'Copy of ' + r.name; n.updated = Date.now(); for (const sc of n.photoSections) { sc.id = uid(); sc.photos = await copyPhotos(sc.photos); } await DB.put(n); listView(); } }, 'Duplicate'),
+        h('button', { class: 'sm', onclick: async () => { const n = normalize(clone(r)); n.id = uid(); n.name = 'Copy of ' + r.name; n.updated = Date.now(); n.photoSections.forEach(sc => (sc.id = uid())); for (const hd of holders(n)) hd.photos = await copyPhotos(hd.photos || []); await DB.put(n); listView(); } }, 'Duplicate'),
         h('button', { class: 'sm', onclick: () => exportJSON(r) }, 'Export'),
         h('button', { class: 'danger sm', onclick: () => sheet('Delete “' + r.name + '”? This cannot be undone.', [['Delete report', async () => { for (const p of allPhotos(normalize(clone(r)))) await DB.delPhoto(p.id); await DB.del(r.id); listView(); }, 'danger']]) }, 'Delete'))));
   }
@@ -205,6 +212,26 @@ function photoGrid(sc) {
   wrap.append(h('div', { class: 'row' }, h('button', { class: 'primary sm', onclick: () => camIn.click() }, '📷 Camera'), h('button', { class: 'sm', onclick: () => fileIn.click() }, '🖼 Photo library')), fileIn, camIn, status, grid);
   draw(); return wrap;
 }
+function photoBlock(label, holder) { return h('div', { class: 'pblock' }, h('label', {}, '📷 ' + label), photoGrid(holder)); }
+function locationsEditor() {
+  const wrap = h('div');
+  const draw = () => {
+    const arr = cur.locations; wrap.innerHTML = '';
+    if (!arr.length) wrap.append(h('div', { class: 'hint' }, 'No locations yet. Add as many as you need — FBO, venue, hotel, safe sites…'));
+    arr.forEach((l, i) => {
+      wrap.append(h('div', { class: 'item loc' }, h('div', { class: 'loc-h' }, 'Location ' + (i + 1)),
+        inp('locations.' + i + '.name', 'Name', { ph: 'e.g. Event Drop Pin' }), inp('locations.' + i + '.address', 'Address'),
+        inp('locations.' + i + '.map', 'Map link', { caps: 'none' }), inp('locations.' + i + '.notes', 'Notes (optional)', { area: true, rows: 2 }),
+        photoBlock('Photos for this location', l),
+        h('div', { class: 'tools', style: 'margin-top:8px' },
+          i > 0 ? h('button', { class: 'sm', onclick: () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; save(); draw(); } }, '↑') : null,
+          i < arr.length - 1 ? h('button', { class: 'sm', onclick: () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; save(); draw(); } }, '↓') : null,
+          h('button', { class: 'danger sm', onclick: () => sheet('Delete location “' + (l.name || 'Untitled') + '”' + (l.photos.length ? ' and its ' + l.photos.length + ' photo(s)' : '') + '?', [['Delete location', async () => { for (const p of l.photos) await DB.delPhoto(p.id); arr.splice(i, 1); await flush(); draw(); }, 'danger']]) }, 'Delete'))));
+    });
+    wrap.append(h('button', { class: 'primary add-loc', style: 'width:100%', onclick: () => { arr.push({ name: '', address: '', map: '', notes: '', photos: [] }); save(); draw(); } }, '＋ Add location'));
+  };
+  draw(); return wrap;
+}
 function photoSections() {
   const wrap = h('div');
   const draw = () => {
@@ -249,12 +276,12 @@ async function editView(id) {
     S('Vehicle package', false, rows('vehicles', [['desc', 'Description'], ['driver', 'Driver / Pax'], ['oom', 'OOM'], ['seats', 'Car seats'], ['issues', 'Issues'], ['equip', 'Equipment']], 'Add vehicle', 'grid')),
     S('Timeline', false, inp('timelineZone', 'Time zone label', { ph: 'LOCAL / EST' }), rows('timeline', [['time', 'Time'], ['event', 'Event'], ['remarks', 'Remarks']], 'Add timeline row')),
     S('Key contacts', false, rows('contacts', [['name', 'Name'], ['position', 'Position'], ['contact', 'Contact information']], 'Add contact')),
-    S('Primary locations', false, rows('locations', [['name', 'Name'], ['address', 'Address'], ['map', 'Map link', { caps: 'none' }]], 'Add location')),
-    S('Routes', false, inp('routes.notes', 'Notes (one per line, “Label: text”)', { area: true, rows: 5 }), h('label', {}, 'Legs'),
+    S('Primary locations · 📷', false, locationsEditor()),
+    S('Routes · 📷', false, inp('routes.notes', 'Notes (one per line, “Label: text”)', { area: true, rows: 5 }), h('label', {}, 'Legs'),
       rows('routes.legs', [['leg', 'Leg'], ['time', 'Time / distance']], 'Add leg', 'grid'),
-      inp('routes.alertLabel', 'Callout label', { ph: 'Restricted' }), inp('routes.alert', 'Restricted / alert callout', { area: true, rows: 2 })),
-    S('Arrival / park plan — FBO', false, inp('arrival', null, { area: true })),
-    S('Location photos', false, photoSections()),
+      inp('routes.alertLabel', 'Callout label', { ph: 'Restricted' }), inp('routes.alert', 'Restricted / alert callout', { area: true, rows: 2 }), photoBlock('Route photos', cur.routes)),
+    S('Arrival / park plan — FBO · 📷', false, inp('arrival', null, { area: true }), photoBlock('FBO / arrival photos', cur.arrivalMedia)),
+    S('Location photos · 📷', false, photoSections()),
     S('Coordination instructions', false, strList('coordination', null, 'Attire: Business Formal')),
     S('Lodging for team', false, inp('lodging', null, { area: true, rows: 2 })),
     S('Medical contingencies', false, inp('medical.label', 'Event label', { ph: 'Venue (Thu 8 OCT)' }),
@@ -277,7 +304,10 @@ async function buildPdfBlob(r) {
     for (const p of sc.photos) { const rec = await DB.photo(p.id); if (rec) photos.push({ dataUrl: await toDataURL(rec.blob), w: p.w, h: p.h, caption: p.caption }); }
     if (photos.length) secs.push({ title: sc.title, photos });
   }
-  const dd = window.buildDocDefinition(r, secs);
+  const res = async list => { const o = []; for (const p of list || []) { const rec = await DB.photo(p.id); if (rec) o.push({ dataUrl: await toDataURL(rec.blob), w: p.w, h: p.h, caption: p.caption }); } return o; };
+  const inline = { arrival: await res(r.arrivalMedia.photos), routes: await res(r.routes.photos), locations: [] };
+  for (const l of r.locations) inline.locations.push(await res(l.photos));
+  const dd = window.buildDocDefinition(r, secs, inline);
   return new Promise((res, rej) => { try { pdfMake.createPdf(dd, null, window.PDF_FONTS).getBlob(res); } catch (e) { rej(e); } });
 }
 async function deliver(blob, name, type) {
@@ -301,7 +331,7 @@ async function generatePDF() {
 /* ---------- JSON export/import ---------- */
 async function exportJSON(r) {
   const out = normalize(clone(r));
-  for (const sc of out.photoSections) { const ps = []; for (const p of sc.photos) { const rec = await DB.photo(p.id); if (rec) ps.push(Object.assign({}, p, { data: await toDataURL(rec.blob) })); } sc.photos = ps; }
+  for (const sc of holders(out)) { const ps = []; for (const p of sc.photos) { const rec = await DB.photo(p.id); if (rec) ps.push(Object.assign({}, p, { data: await toDataURL(rec.blob) })); } sc.photos = ps; }
   const blob = new Blob([JSON.stringify({ format: 'advance-report', version: 2, report: out })], { type: 'application/json' });
   deliver(blob, fname(r, 'json'), 'application/json');
 }
@@ -311,7 +341,7 @@ function importJSON() {
     try {
       const j = JSON.parse(await i.files[0].text()); const src = j.report || j;
       const r = normalize(Object.assign(blank(), clone(src))); r.id = uid(); r.updated = Date.now(); // migrate() handles v1 'photos'
-      for (const sc of r.photoSections) { const ps = []; for (const p of sc.photos) { if (!p.data) continue; const id = uid(); await DB.putPhoto({ id, blob: dataURLtoBlob(p.data) }); ps.push({ id, w: p.w, h: p.h, caption: p.caption || '' }); } sc.id = uid(); sc.photos = ps; }
+      for (const sc of holders(r)) { const ps = []; for (const p of sc.photos || []) { if (!p.data) continue; const id = uid(); await DB.putPhoto({ id, blob: dataURLtoBlob(p.data) }); ps.push({ id, w: p.w, h: p.h, caption: p.caption || '' }); } sc.photos = ps; } r.photoSections.forEach(sc => (sc.id = uid()));
       await DB.put(r); location.hash = '#r/' + r.id;
     } catch (e) { alert('Import failed: ' + e.message); }
   };
@@ -321,6 +351,10 @@ function importJSON() {
 /* ---------- Router ---------- */
 async function route() { const m = location.hash.match(/^#r\/(.+)$/); if (m) editView(m[1]); else listView(); }
 (async () => {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
+  if ('serviceWorker' in navigator) {
+    const hadController = !!navigator.serviceWorker.controller; let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded && !sessionStorage.getItem('swReloaded')) { reloaded = true; sessionStorage.setItem('swReloaded', '1'); setTimeout(() => sessionStorage.removeItem('swReloaded'), 10000); flush().finally(() => location.reload()); } });
+    navigator.serviceWorker.register('sw.js').then(reg => reg.update()).catch(e => console.warn(e));
+  }
   await seed(); route();
 })();

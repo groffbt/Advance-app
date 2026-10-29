@@ -36,3 +36,8 @@ textarea{min-height:90px;resize:vertical}
 .chk{display:flex;align-items:center;gap:8px;margin-top:8px}.chk input{width:24px;height:24px}
 [hidden]{display:none!important}
 .cap{margin-top:4px;font-size:14px;padding:7px 8px}.psec{background:#fff}
+.loc{background:#fff;border:1px solid #cfd3da;border-left:4px solid #111}
+.loc-h{font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#444}
+.pblock{margin-top:12px;padding:10px;border:1px dashed #bbb;border-radius:12px;background:#f7f8fa}
+.pblock>label{margin-top:0;color:#111}
+.add-loc{margin-top:6px}
