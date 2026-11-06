@@ -1,7 +1,7 @@
 // Offline support. Network-first for the app shell (HTML/JS/CSS/manifest) so updates land on first launch;
 // cache-first for heavy static assets (lib/, icons/, sample/). Bump VERSION to ship updates.
-const VERSION='advance-v3';
-const FILES=["./", "index.html", "style.css", "app.js", "pdf.js", "manifest.webmanifest", "lib/pdfmake.min.js", "lib/fonts.js", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
+const VERSION='advance-v19';
+const FILES=["./", "index.html", "style.css", "lock.js", "app.js", "pdf.js", "team.js", "import.js", "routes.js", "weather.js", "mapexport.js", "manifest.webmanifest", "lib/pdfmake.min.js", "lib/fonts.js", "lib/firebase.js", "lib/pdfjs/pdf.min.js", "lib/fflate.min.js", "lib/pdfjs/pdf.worker.min.js", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener('install',e=>e.waitUntil(caches.open(VERSION).then(c=>c.addAll(FILES.map(f=>new Request(f,{cache:'reload'})))).then(()=>self.skipWaiting())));
 // On upgrade from an older version, reload open windows once so they pick up the new shell
 // (older builds' page code has no reload-on-update logic of its own).

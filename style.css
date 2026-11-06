@@ -22,8 +22,8 @@ textarea{min-height:90px;resize:vertical}
 .item{border:1px solid #e2e2e2;border-radius:12px;padding:10px;margin:10px 0;background:#fcfcfc}
 .item .tools{display:flex;justify-content:flex-end;gap:6px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-.ph{position:relative;aspect-ratio:1;background:#eee;border-radius:8px;overflow:hidden}
+.photos{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.ph{position:relative;aspect-ratio:4/3;background:#eee;border-radius:8px;overflow:hidden}
 .ph img{width:100%;height:100%;object-fit:contain}
 .ph .x{position:absolute;top:4px;right:4px;width:32px;height:32px;min-height:0;padding:0;border-radius:16px;background:#000a;color:#fff}
 .ph .mv{position:absolute;bottom:4px;left:4px;display:flex;gap:4px}.ph .mv button{width:32px;height:32px;min-height:0;padding:0;background:#fffc}
@@ -41,3 +41,85 @@ textarea{min-height:90px;resize:vertical}
 .pblock{margin-top:12px;padding:10px;border:1px dashed #bbb;border-radius:12px;background:#f7f8fa}
 .pblock>label{margin-top:0;color:#111}
 .add-loc{margin-top:6px}
+
+.day-block{background:#f1f1f1;border-color:#bbb}.day-block>label{margin-top:0}.day-label{font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:14px;margin-bottom:6px}
+.item.in-day{margin-left:10px}
+
+/* team sharing */
+button.acct{font-size:20px;opacity:.55}button.acct.on{opacity:1}
+#saved.off{color:#fc6}
+h2.sech{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#555;margin:18px 4px 8px}
+.card.team{border-left:4px solid #2a6}.card.team.active{box-shadow:0 0 0 2px #2a6}
+.badge{font-size:11px;background:#2a6;color:#fff;border-radius:6px;padding:2px 6px;margin-left:8px;vertical-align:middle;letter-spacing:.05em}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:17px;letter-spacing:.12em;color:#111;user-select:all;-webkit-user-select:all}
+.teamline{background:#e9f6ee;border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:14px}
+.msg{font-size:14px;margin-top:8px;color:#265}.msg.bad{color:#a00}
+#teamSel{margin-bottom:8px}
+.nophoto{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:#888;text-align:center;padding:6px}
+/* import PDF / JSON */
+.imp{margin:4px 0 6px}.imp .msg{margin-top:6px}
+#sheet>div.pv{max-height:85vh;overflow:auto}
+.pv-list{margin:10px 0 4px;border:1px solid #e2e2e2;border-radius:12px;background:#fcfcfc}
+.pv-row{padding:8px 10px;border-top:1px solid #eee;font-size:14px;white-space:pre-wrap;word-break:break-word}.pv-row:first-child{border-top:0}
+.pv-row b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#555;margin-bottom:2px}
+/* route builder */
+a.btnlink{display:inline-flex;align-items:center;padding:8px 12px;min-height:40px;font-size:15px;border-radius:10px;background:#111;color:#fff;text-decoration:none}
+.est{margin-top:8px;font-size:14px}.est>div{padding:2px 0}.est-total{font-weight:700}
+.rchart{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0 4px;background:#fff}
+.rchart th,.rchart td{border:1px solid #444;padding:4px 6px;text-align:left;vertical-align:top}
+.rchart th{background:#111;color:#fff;font-size:10px;letter-spacing:.04em;text-transform:uppercase}
+.rchart-total td{background:#f3f3f3}
+.rchart td .sm{padding:2px 8px;font-size:11px}
+/* imported original pages + viewer */
+.pblock.pages .photos{grid-template-columns:repeat(3,1fr)}.pblock.pages .ph img{cursor:zoom-in}
+.photos .ph img{cursor:zoom-in}
+#sheet>div.viewer{max-height:100vh;overflow:auto;padding-top:calc(env(safe-area-inset-top) + 12px)}
+.viewer img{width:100%;height:auto;display:block;border-radius:8px;background:#fff}
+.pv select{margin-bottom:4px}.pv-note{margin:10px 0;font-size:14px;color:#555}
+.msg.stale{font-size:13px}
+/* weather from zip */
+.wx-row{display:flex;gap:8px;align-items:flex-end}.wx-row>div{flex:1}.wx-row button{min-height:46px}
+.figpick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
+.figpick .fig{display:block;margin:0;border:1px solid #e2e2e2;border-radius:10px;padding:6px;background:#fcfcfc;font-weight:400;color:#111}
+.figpick img{width:100%;height:110px;object-fit:contain;background:#fff;border-radius:6px}.figpick .chk{font-size:13px;margin-top:4px;align-items:flex-start}
+.pblock.figs .photos{grid-template-columns:1fr 1fr}
+/* task org columns */
+.tocols{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0 10px}.tocol{margin:6px 0}.tocol textarea{min-height:110px}
+/* map export */
+.maplinks{margin-top:8px;font-size:15px}.maplinks a{color:#1a4fa0}.maplist{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px}
+/* intel sections */
+.isec{background:#fff;border-left:4px solid #111}.add-isec{margin-top:8px}
+/* v11: bold titles */
+input.sec-title-in,.tocol input[data-path$=".title"],.sec-title{font-weight:700}
+.blk-h{font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#111;margin:16px 0 4px}
+label{font-weight:700}.day-label,.loc-h,details.sec>summary{font-weight:700}
+/* v12: multiple named routes */
+.rsec{background:#fff;border-left:4px solid #111}.rsec .rname{font-weight:700}
+.add-route{margin-top:8px}.rlist .hint{margin:8px 0}
+
+/* v12: team folders + templates */
+.card.folder{border-left:4px solid #1a4fa0;cursor:pointer}.card.tmpl{border-left:4px solid #555}
+.crumb{font-size:14px;margin:4px 0 12px}.crumb a{color:#1a4fa0;text-decoration:none}
+.tmplline{background:#eee}
+/* v13: clearer per-route stops */
+.rsec .rstops{margin:4px 0 8px}.rsec .stop{background:#fff}.rsec .add-stop{font-weight:700}
+/* v18 App lock */
+html.locked body>*:not(#lockScreen){visibility:hidden!important}
+html.locked body{overflow:hidden}
+#lockScreen{position:fixed;inset:0;z-index:2147483647;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px)}
+#lockScreen .lk{text-align:center;max-width:320px;width:100%}
+#lockScreen img{width:84px;height:84px;border-radius:18px}
+#lockScreen h2{margin:14px 0 2px;font-size:22px;letter-spacing:.04em}
+#lockScreen p{margin:0 0 22px;color:#aaa}
+#lockScreen button{width:100%;background:#fff;color:#111;font-weight:700}
+#lockScreen .lkmsg{margin-top:12px;font-size:14px;color:#f99;min-height:1.2em}
+.lockcard select{margin-top:2px}
+/* v18 team members */
+ul.members{list-style:none;margin:4px 0 0;padding:0}
+ul.members li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #eee;font-size:14px;word-break:break-all}
+ul.members li:first-child{border-top:0}
+.badge.own{background:#1a4fa0}.resetcode{margin-left:8px}
+.card.removed{border-left:4px solid #a00}
+
+/* v19: vehicle chart preview */
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.vchart td,.vchart th{white-space:nowrap}.vchart td{font-size:12px}
